@@ -16,6 +16,9 @@ targets:
           - ".github/**"
           - "build/**"
           - ".git/**"
+    dependencies:
+      - sdk: Network.framework
+      - sdk: Security.framework
     settings:
       base:
         PRODUCT_NAME: GoDaddy Invoice Scanner
