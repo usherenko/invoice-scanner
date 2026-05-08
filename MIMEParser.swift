@@ -119,7 +119,7 @@ struct MIMEParser {
 
     private static func decodeQuotedPrintable(_ text: String) -> Data {
         var result = Data()
-        var lines = text.components(separatedBy: "\n")
+        let lines = text.components(separatedBy: "\n")
         for (i, line) in lines.enumerated() {
             var l = line.hasSuffix("\r") ? String(line.dropLast()) : line
             let softBreak = l.hasSuffix("=")

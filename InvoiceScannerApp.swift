@@ -10,6 +10,5 @@ struct InvoiceScannerApp: App {
             ContentView()
         }
         .windowResizability(.contentSize)
-        .defaultSize(width: 460, height: 520)
     }
 }

@@ -2,7 +2,7 @@ name: InvoiceScanner
 options:
   bundleIdPrefix: com.usherenko
   deploymentTarget:
-    macOS: "12.0"
+    macOS: "13.0"
 
 targets:
   InvoiceScanner:
@@ -24,7 +24,7 @@ targets:
         PRODUCT_NAME: GoDaddy Invoice Scanner
         PRODUCT_BUNDLE_IDENTIFIER: com.usherenko.invoicescanner
         DEVELOPMENT_TEAM: UsherenkoAI
-        MACOSX_DEPLOYMENT_TARGET: "12.0"
+        MACOSX_DEPLOYMENT_TARGET: "13.0"
         SWIFT_VERSION: "5.9"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_IDENTITY: ""

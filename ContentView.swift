@@ -187,8 +187,8 @@ struct ContentView: View {
         }
     }
 
-    private func appendLog(_ msg: String) {
-        DispatchQueue.main.async { logLines.append(msg) }
+    private nonisolated func appendLog(_ msg: String) {
+        DispatchQueue.main.async { self.logLines.append(msg) }
     }
 
     private func monthString(from date: Date) -> String {
