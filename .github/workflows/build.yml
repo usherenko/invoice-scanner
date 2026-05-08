@@ -15,6 +15,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Resize icon to 1024x1024
+        run: sips -z 1024 1024 Assets.xcassets/AppIcon.appiconset/AppIcon.png
+
       - name: Install XcodeGen
         run: brew install xcodegen
 
@@ -32,6 +35,11 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             2>&1
+
+      - name: Ad-hoc sign
+        run: |
+          APP=$(find build/DerivedData -name "*.app" -type d | head -1)
+          codesign --force --deep --sign - "$APP"
 
       - name: Package app
         run: |
