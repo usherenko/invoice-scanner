@@ -4,16 +4,17 @@ struct ContentView: View {
     @AppStorage("email")     private var email     = ""
     @AppStorage("outputDir") private var outputDir = "\(NSHomeDirectory())/Invoices"
 
-    @State private var password    = ""
-    @State private var isRunning   = false
+    @State private var password     = ""
+    @State private var isRunning    = false
     @State private var logLines: [String] = []
-    @State private var selectedDate = Date()
+    @State private var selectedMonth = Calendar.current.component(.month, from: Date())
+    @State private var selectedYear  = Calendar.current.component(.year,  from: Date())
 
-    private var selectedMonthLabel: String {
-        let df = DateFormatter()
-        df.dateFormat = "MMMM yyyy"
-        return df.string(from: selectedDate)
-    }
+    private let months = ["January","February","March","April","May","June",
+                          "July","August","September","October","November","December"]
+    private var years: [Int] { (2020...Calendar.current.component(.year, from: Date())).reversed().map { $0 } }
+
+    private var selectedMonthLabel: String { "\(months[selectedMonth - 1]) \(selectedYear)" }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -60,16 +61,25 @@ struct ContentView: View {
             }
             Divider().padding(.leading, 80)
             formRow(label: "Month") {
-                DatePicker(
-                    "",
-                    selection: $selectedDate,
-                    displayedComponents: [.date]
-                )
-                .datePickerStyle(.stepperField)
+                Picker("", selection: $selectedMonth) {
+                    ForEach(1...12, id: \.self) { i in
+                        Text(months[i - 1]).tag(i)
+                    }
+                }
                 .labelsHidden()
+                .frame(width: 120)
+
+                Picker("", selection: $selectedYear) {
+                    ForEach(years, id: \.self) { y in
+                        Text(String(y)).tag(y)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 80)
 
                 Button("This month") {
-                    selectedDate = Date()
+                    selectedMonth = Calendar.current.component(.month, from: Date())
+                    selectedYear  = Calendar.current.component(.year,  from: Date())
                 }
                 .buttonStyle(.borderless)
                 .foregroundColor(.blue)
@@ -173,7 +183,7 @@ struct ContentView: View {
         let emailCopy = email
         let passCopy  = password
         let dirCopy   = outputDir
-        let month     = monthString(from: selectedDate)
+        let month     = String(format: "%04d-%02d", selectedYear, selectedMonth)
 
         Task {
             await ScanManager.scan(
@@ -189,12 +199,5 @@ struct ContentView: View {
 
     private nonisolated func appendLog(_ msg: String) {
         DispatchQueue.main.async { self.logLines.append(msg) }
-    }
-
-    private func monthString(from date: Date) -> String {
-        let df = DateFormatter()
-        df.dateFormat = "yyyy-MM"
-        df.locale = Locale(identifier: "en_US_POSIX")
-        return df.string(from: date)
     }
 }
