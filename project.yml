@@ -16,6 +16,19 @@ targets:
           - ".github/**"
           - "build/**"
           - ".git/**"
+    info:
+      path: Info.plist
+      properties:
+        CFBundleName: GoDaddy Invoice Scanner
+        CFBundleDisplayName: GoDaddy Invoice Scanner
+        CFBundleIdentifier: com.usherenko.invoicescanner
+        CFBundleVersion: "1"
+        CFBundleShortVersionString: "1.0"
+        CFBundlePackageType: APPL
+        CFBundleExecutable: $(EXECUTABLE_NAME)
+        LSMinimumSystemVersion: "13.0"
+        NSPrincipalClass: NSApplication
+        NSHighResolutionCapable: true
     dependencies:
       - sdk: Network.framework
       - sdk: Security.framework
