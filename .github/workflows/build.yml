@@ -1,0 +1,43 @@
+name: Build
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build archive
+        run: |
+          xcodebuild archive \
+            -project InvoiceScanner.xcodeproj \
+            -scheme InvoiceScanner \
+            -archivePath build/InvoiceScanner.xcarchive \
+            -configuration Release \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Package app
+        run: |
+          APP_PATH="build/InvoiceScanner.xcarchive/Products/Applications/InvoiceScanner.app"
+          cp -r "$APP_PATH" "build/GoDaddy Invoice Scanner.app"
+          cd build && zip -r "GoDaddy Invoice Scanner.zip" "GoDaddy Invoice Scanner.app"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GoDaddy-Invoice-Scanner
+          path: "build/GoDaddy Invoice Scanner.zip"
+          retention-days: 30

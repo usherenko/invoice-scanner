@@ -1,0 +1,29 @@
+name: InvoiceScanner
+options:
+  bundleIdPrefix: com.usherenko
+  deploymentTarget:
+    macOS: "12.0"
+
+targets:
+  InvoiceScanner:
+    type: application
+    platform: macOS
+    sources:
+      - path: .
+        excludes:
+          - project.yml
+          - "*.md"
+          - ".github/**"
+          - "build/**"
+          - ".git/**"
+    settings:
+      base:
+        PRODUCT_NAME: GoDaddy Invoice Scanner
+        PRODUCT_BUNDLE_IDENTIFIER: com.usherenko.invoicescanner
+        DEVELOPMENT_TEAM: UsherenkoAI
+        MACOSX_DEPLOYMENT_TARGET: "12.0"
+        SWIFT_VERSION: "5.9"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_IDENTITY: ""
+        CODE_SIGNING_REQUIRED: "NO"
+        CODE_SIGNING_ALLOWED: "NO"
