@@ -9,7 +9,7 @@ env:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-latest
 
     steps:
       - name: Checkout
@@ -36,6 +36,11 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             MACOSX_DEPLOYMENT_TARGET=12.0 \
             2>&1
+
+      - name: Patch minimum OS version in Info.plist
+        run: |
+          APP=$(find build/DerivedData -name "*.app" -type d | head -1)
+          /usr/libexec/PlistBuddy -c "Set :LSMinimumSystemVersion 12.0" "$APP/Contents/Info.plist"
 
       - name: Ad-hoc sign
         run: |
