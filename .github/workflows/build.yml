@@ -31,6 +31,8 @@ jobs:
             -scheme InvoiceScanner \
             -configuration Release \
             -derivedDataPath build/DerivedData \
+            ARCHS="arm64 x86_64" \
+            ONLY_ACTIVE_ARCH=NO \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
