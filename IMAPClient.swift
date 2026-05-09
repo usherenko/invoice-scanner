@@ -42,11 +42,21 @@ actor IMAPClient {
     }
 
     func login(user: String, password: String) async throws {
-        let u = quoted(user)
-        let p = quoted(password)
-        let lines = try await command("LOGIN \(u) \(p)")
+        // Use IMAP literals so any special character in the password works
+        let tag = nextTag()
+        let userBytes = user.utf8.count
+        let passBytes = password.utf8.count
+
+        try await send("\(tag) LOGIN {\(userBytes)}\r\n")
+        _ = try await readLine()          // server sends "+ go ahead"
+        try await send("\(user) {\(passBytes)}\r\n")
+        _ = try await readLine()          // server sends "+ go ahead"
+        try await send("\(password)\r\n")
+
+        let lines = try await readUntilTagged(tag: tag)
         guard lines.last?.contains("OK") == true else {
-            throw IMAPError.loginFailed
+            let serverMsg = lines.last ?? "no response from server"
+            throw IMAPError.loginFailed(serverMsg)
         }
     }
 
@@ -176,14 +186,14 @@ actor IMAPClient {
 
 enum IMAPError: LocalizedError {
     case cancelled
-    case loginFailed
+    case loginFailed(String)
     case commandFailed(String)
 
     var errorDescription: String? {
         switch self {
-        case .cancelled:          return "Connection was cancelled."
-        case .loginFailed:        return "Login failed — check your email and password."
-        case .commandFailed(let c): return "IMAP command failed: \(c)"
+        case .cancelled:              return "Connection was cancelled."
+        case .loginFailed(let msg):   return "Login failed — \(msg)\n\nTip: make sure IMAP is enabled in your GoDaddy email settings."
+        case .commandFailed(let c):   return "IMAP command failed: \(c)"
         }
     }
 }
