@@ -37,19 +37,20 @@ jobs:
             MACOSX_DEPLOYMENT_TARGET=12.0 \
             2>&1
 
-      - name: Patch binary and Info.plist to macOS 12.0
+      - name: Patch all binaries and Info.plist to macOS 12.0
         run: |
           APP=$(find build/DerivedData -name "*.app" -type d | head -1)
-          BINARY="$APP/Contents/MacOS/$(ls "$APP/Contents/MacOS/" | head -1)"
 
-          echo "=== Before patch ==="
-          vtool -show-build "$BINARY"
+          # Patch every Mach-O binary in the bundle (main exe + all dylibs)
+          find "$APP" -type f | while read -r f; do
+            if file "$f" | grep -qE "Mach-O (64-bit )?executable|Mach-O (64-bit )?dynamically linked shared library|Mach-O (64-bit )?bundle"; then
+              echo "Patching: $f"
+              vtool -set-build-version macos 12.0 12.0 -replace -output "$f" "$f" 2>/dev/null || true
+            fi
+          done
 
-          vtool -set-build-version macos 12.0 12.0 -replace -output "$BINARY" "$BINARY"
           /usr/libexec/PlistBuddy -c "Set :LSMinimumSystemVersion 12.0" "$APP/Contents/Info.plist"
-
-          echo "=== After patch ==="
-          vtool -show-build "$BINARY"
+          echo "Done patching"
 
       - name: Ad-hoc sign
         run: |
