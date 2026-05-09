@@ -150,9 +150,9 @@ struct ContentView: View {
             }
             .frame(height: 180)
             .background(Color(NSColor.textBackgroundColor))
-            .onChange(of: logLines.count) { _ in
+            .onChange(of: logLines.count, perform: { _ in
                 withAnimation { proxy.scrollTo(logLines.count - 1, anchor: .bottom) }
-            }
+            })
         }
     }
 
