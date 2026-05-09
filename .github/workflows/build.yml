@@ -63,7 +63,8 @@ jobs:
         run: |
           APP=$(find build/DerivedData -name "*.app" -type d | head -1)
           cp -r "$APP" "build/GoDaddy Invoice Scanner.app"
-          cd build && zip -r "GoDaddy Invoice Scanner.zip" "GoDaddy Invoice Scanner.app"
+          chmod +x "build/GoDaddy Invoice Scanner.app/Contents/MacOS/"*
+          cd build && ditto -c -k --keepParent "GoDaddy Invoice Scanner.app" "GoDaddy Invoice Scanner.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
