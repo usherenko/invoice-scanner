@@ -9,6 +9,5 @@ struct InvoiceScannerApp: App {
         WindowGroup {
             ContentView()
         }
-        .windowResizability(.contentSize)
     }
 }

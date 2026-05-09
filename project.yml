@@ -2,7 +2,7 @@ name: InvoiceScanner
 options:
   bundleIdPrefix: com.usherenko
   deploymentTarget:
-    macOS: "13.0"
+    macOS: "12.0"
 
 targets:
   InvoiceScanner:
@@ -26,7 +26,7 @@ targets:
         CFBundleShortVersionString: "1.0"
         CFBundlePackageType: APPL
         CFBundleExecutable: $(EXECUTABLE_NAME)
-        LSMinimumSystemVersion: "13.0"
+        LSMinimumSystemVersion: "12.0"
         NSPrincipalClass: NSApplication
         NSHighResolutionCapable: true
     dependencies:
@@ -37,7 +37,7 @@ targets:
         PRODUCT_NAME: GoDaddy Invoice Scanner
         PRODUCT_BUNDLE_IDENTIFIER: com.usherenko.invoicescanner
         DEVELOPMENT_TEAM: UsherenkoAI
-        MACOSX_DEPLOYMENT_TARGET: "13.0"
+        MACOSX_DEPLOYMENT_TARGET: "12.0"
         SWIFT_VERSION: "5.9"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_IDENTITY: ""
