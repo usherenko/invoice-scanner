@@ -31,7 +31,12 @@ struct ContentView: View {
             tabPicker
             Divider()
             if activeTab == .outgoing {
-                if auth.isSignedIn { form } else { signInView }
+                if auth.isSignedIn {
+                    form
+                } else {
+                    folderOnlyBar
+                    signInView
+                }
                 if !countResults.isEmpty {
                     invoiceCountView
                 }
@@ -143,7 +148,7 @@ struct ContentView: View {
                 .buttonStyle(.borderless).foregroundColor(.blue).font(.callout)
             }
             Divider().padding(.leading, 80)
-            formRow(label: "Save to") {
+            formRow(label: "Invoice Location") {
                 TextField("~/Invoices", text: $outputDir)
                     .textFieldStyle(.roundedBorder)
                 Button("…") { chooseFolder() }.buttonStyle(.borderless)
@@ -182,6 +187,37 @@ struct ContentView: View {
                 Spacer()
             }
             .padding(.vertical, 14)
+        }
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: - Folder + count (shown without login)
+
+    private var folderOnlyBar: some View {
+        VStack(spacing: 0) {
+            formRow(label: "Invoice Location") {
+                TextField("~/Invoices", text: $outputDir)
+                    .textFieldStyle(.roundedBorder)
+                Button("…") { chooseFolder() }.buttonStyle(.borderless)
+            }
+            HStack {
+                Spacer()
+                Button(action: browseAndCount) {
+                    HStack(spacing: 6) {
+                        if isCounting {
+                            ProgressView().scaleEffect(0.6).frame(width: 14, height: 14)
+                        } else {
+                            Image(systemName: "sum")
+                        }
+                        Text("Count Folder").fontWeight(.medium)
+                    }
+                }
+                .disabled(isCounting)
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                Spacer()
+            }
+            .padding(.vertical, 8)
         }
         .padding(.horizontal, 16)
     }
