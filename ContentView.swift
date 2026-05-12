@@ -13,13 +13,16 @@ struct ContentView: View {
     @State private var isScanning       = false
     @State private var incomingResults: [InvoiceResult] = []
     @State private var incomingScanned  = false
-    @State private var selectedMonth = Calendar.current.component(.month, from: Date())
-    @State private var selectedYear  = Calendar.current.component(.year,  from: Date())
+    @State private var selectedMonth    = Calendar.current.component(.month, from: Date())
+    @State private var selectedYear     = Calendar.current.component(.year,  from: Date())
+    @State private var countResults:    [InvoiceResult] = []
+    @State private var isCounting       = false
 
     private let months = ["January","February","March","April","May","June",
                           "July","August","September","October","November","December"]
     private var years: [Int] { (2020...Calendar.current.component(.year, from: Date())).reversed().map { $0 } }
     private var selectedMonthLabel: String { "\(months[selectedMonth - 1]) \(selectedYear)" }
+    private var grandTotal: Double { countResults.map(\.total).reduce(0, +) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,6 +32,9 @@ struct ContentView: View {
             Divider()
             if activeTab == .outgoing {
                 if auth.isSignedIn { form } else { signInView }
+                if !countResults.isEmpty {
+                    invoiceCountView
+                }
             } else {
                 incomingForm
             }
@@ -143,8 +149,22 @@ struct ContentView: View {
                 Button("…") { chooseFolder() }.buttonStyle(.borderless)
             }
 
-            HStack {
+            HStack(spacing: 10) {
                 Spacer()
+                Button(action: browseAndCount) {
+                    HStack(spacing: 6) {
+                        if isCounting && !isRunning {
+                            ProgressView().scaleEffect(0.6).frame(width: 14, height: 14)
+                        } else {
+                            Image(systemName: "sum")
+                        }
+                        Text("Count Folder").fontWeight(.medium)
+                    }
+                }
+                .disabled(isCounting || isRunning)
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+
                 Button(action: startScan) {
                     HStack(spacing: 6) {
                         if isRunning {
@@ -156,12 +176,12 @@ struct ContentView: View {
                     }
                     .frame(minWidth: 160)
                 }
-                .disabled(isRunning)
+                .disabled(isRunning || isCounting)
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-                .padding(.vertical, 14)
                 Spacer()
             }
+            .padding(.vertical, 14)
         }
         .padding(.horizontal, 16)
     }
@@ -253,6 +273,70 @@ struct ContentView: View {
         .background(Color(NSColor.textBackgroundColor))
     }
 
+    // MARK: - Outgoing invoice count results
+
+    private var invoiceCountView: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Invoice Totals")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Button { countResults = [] } label: {
+                    Image(systemName: "xmark").font(.caption2)
+                }
+                .buttonStyle(.borderless)
+                .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.top, 6)
+            .padding(.bottom, 4)
+
+            Divider()
+
+            ForEach(countResults) { result in
+                HStack(spacing: 6) {
+                    Image(systemName: result.total > 0 ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                        .font(.caption2)
+                        .foregroundColor(result.total > 0 ? .green : .orange)
+                    Text(result.filename)
+                        .font(.system(.caption2, design: .monospaced))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(result.source)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .frame(width: 76, alignment: .leading)
+                    Text(String(format: "€%.2f", result.total))
+                        .font(.system(.caption2, design: .monospaced))
+                        .frame(width: 68, alignment: .trailing)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 2)
+            }
+
+            Divider()
+
+            HStack {
+                Text("\(countResults.count) PDF(s)")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text(String(format: "Total: €%.2f", grandTotal))
+                    .font(.caption)
+                    .fontWeight(.semibold)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+        }
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(6)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+    }
+
     // MARK: - Shared form row
 
     private func formRow<Content: View>(label: String, @ViewBuilder content: () -> Content) -> some View {
@@ -338,14 +422,66 @@ struct ContentView: View {
         }
     }
 
+    private func browseAndCount() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories    = true
+        panel.canChooseFiles          = false
+        panel.allowsMultipleSelection = false
+        panel.prompt                  = "Count"
+        panel.directoryURL            = URL(fileURLWithPath: outputDir)
+        if panel.runModal() == .OK, let url = panel.url {
+            runCount(on: url)
+        }
+    }
+
     private func startScan() {
-        logLines  = []
-        isRunning = true
-        let month   = String(format: "%04d-%02d", selectedYear, selectedMonth)
-        let dirCopy = outputDir
+        logLines     = []
+        countResults = []
+        isRunning    = true
+        let month    = String(format: "%04d-%02d", selectedYear, selectedMonth)
+        let dirCopy  = outputDir
         Task {
             await ScanManager.scan(month: month, outputDir: dirCopy, log: appendLog)
+
+            // Auto-count the folder that was just downloaded into
+            let downloadedFolder = URL(fileURLWithPath: dirCopy).appendingPathComponent(month)
+            if FileManager.default.fileExists(atPath: downloadedFolder.path) {
+                await MainActor.run { isCounting = true }
+                let results = await Task.detached(priority: .userInitiated) {
+                    IncomingScanner.scan(folder: downloadedFolder)
+                }.value
+                await MainActor.run {
+                    self.countResults = results
+                    self.isCounting   = false
+                    let total = results.map(\.total).reduce(0, +)
+                    if !results.isEmpty {
+                        self.appendLog("  ✓  \(results.count) PDF(s) counted — Total: €\(String(format: "%.2f", total))")
+                    }
+                }
+            }
+
             await MainActor.run { isRunning = false }
+        }
+    }
+
+    private func runCount(on folder: URL) {
+        countResults = []
+        isCounting   = true
+        appendLog("Counting PDFs in \(folder.lastPathComponent)…")
+        Task {
+            let results = await Task.detached(priority: .userInitiated) {
+                IncomingScanner.scan(folder: folder)
+            }.value
+            await MainActor.run {
+                self.countResults = results
+                self.isCounting   = false
+                let total = results.map(\.total).reduce(0, +)
+                if results.isEmpty {
+                    self.appendLog("No PDFs found in \(folder.lastPathComponent).")
+                } else {
+                    self.appendLog("  ✓  \(results.count) PDF(s) — Total: €\(String(format: "%.2f", total))")
+                }
+            }
         }
     }
 
