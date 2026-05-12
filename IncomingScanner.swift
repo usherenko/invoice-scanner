@@ -32,6 +32,10 @@ enum IncomingScanner {
             text = docText
         }
 
+        // Write extracted text next to the PDF so you can inspect what PDFKit sees.
+        let debugURL = url.deletingPathExtension().appendingPathExtension("txt")
+        try? text.write(to: debugURL, atomically: true, encoding: .utf8)
+
         guard let total = extractTotal(from: text) else { return nil }
         return InvoiceResult(
             filename: url.lastPathComponent,
@@ -43,19 +47,13 @@ enum IncomingScanner {
     // MARK: - Private helpers
 
     private static func extractTotal(from text: String) -> Double? {
-        // Pattern breakdown:
-        //   (?<![Ss]ub) — negative lookbehind: skip "Subtotal"/"SUBTOTAL"
-        //   total\b     — the word "total" (case-insensitive via option)
-        //   [^\d\n]*    — unlimited non-digit chars on the same line (covers right-aligned
-        //                 layouts where the label and amount have many spaces between them)
-        //   \n?         — optionally cross one newline (amount on next line)
-        //   [^\d\n]*    — non-digit chars before the number on the next line (e.g. "€")
-        //   (\d+[.,]\d{2}) — the decimal amount (comma or period separator)
-        //
-        // Taking max() across all matches because the grand total is always the
-        // largest figure; column-header "TOTAL" rows pick up smaller line-item amounts.
+        // No \b after "total" — digits are word chars in regex, so "TOTAL529,50€"
+        // (label and amount merged in the PDF stream with no separator) would fail \b.
+        // [^\d\n]* allows unlimited spaces/symbols on the same line (right-aligned layouts).
+        // \n? lets the amount sit on the very next line.
+        // max() picks the grand total over any smaller line-item totals.
         guard let regex = try? NSRegularExpression(
-            pattern: #"(?<![Ss]ub)total\b[^\d\n]*\n?[^\d\n]*(\d+[.,]\d{2})"#,
+            pattern: #"(?<![Ss]ub)total[^\d\n]*\n?[^\d\n]*(\d+[.,]\d{2})"#,
             options: .caseInsensitive
         ) else { return nil }
 
