@@ -420,7 +420,7 @@ struct ContentView: View {
                         .font(.callout)
                     Text(incomingResults.isEmpty
                          ? "Not scanned — use Incoming tab"
-                         : "\(incomingResults.count) invoice(s)")
+                         : "\(URL(fileURLWithPath: incomingDir).lastPathComponent) · \(incomingResults.count) invoice(s)")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
