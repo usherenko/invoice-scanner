@@ -420,7 +420,7 @@ struct ContentView: View {
                         .font(.callout)
                     Text(incomingResults.isEmpty
                          ? "Not scanned — use Incoming tab"
-                         : "\(URL(fileURLWithPath: incomingDir).lastPathComponent) · \(incomingResults.count) invoice(s)")
+                         : "\(dateRangeLabel(for: incomingResults)) · \(incomingResults.count) invoice(s)")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
@@ -633,6 +633,21 @@ struct ContentView: View {
             incomingScanned = true
             isScanning      = false
         }
+    }
+
+    private func dateRangeLabel(for results: [InvoiceResult]) -> String {
+        let dates = results.compactMap(\.date).sorted()
+        guard let first = dates.first, let last = dates.last else {
+            return URL(fileURLWithPath: incomingDir).lastPathComponent
+        }
+        let df = DateFormatter()
+        df.dateFormat = "MMM yyyy"
+        let firstStr = df.string(from: first)
+        let lastStr  = df.string(from: last)
+        if firstStr == lastStr { return firstStr }
+        let shortDf = DateFormatter()
+        shortDf.dateFormat = "MMM"
+        return "\(shortDf.string(from: first))–\(lastStr)"
     }
 
     private func fitWindowToContent() {

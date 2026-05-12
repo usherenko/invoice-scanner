@@ -6,6 +6,7 @@ struct InvoiceResult: Identifiable {
     let filename: String
     let source: String   // "Holded" | "CommonGround" | "Unknown"
     let total: Double
+    let date: Date?
 }
 
 enum IncomingScanner {
@@ -39,10 +40,12 @@ enum IncomingScanner {
         text = normalizeText(text)
 
         guard let total = extractTotal(from: text) else { return nil }
+        let date = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
         return InvoiceResult(
             filename: url.lastPathComponent,
             source: detectSource(from: text),
-            total: total
+            total: total,
+            date: date
         )
     }
 
