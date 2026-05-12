@@ -44,7 +44,6 @@ struct ContentView: View {
                 logArea
             } else if activeTab == .incoming {
                 incomingForm
-                Divider()
                 incomingResultsArea
             } else {
                 calculationsView
@@ -259,55 +258,80 @@ struct ContentView: View {
     // MARK: - Incoming results
 
     private var incomingResultsArea: some View {
-        VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Invoice Totals")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+                Spacer()
+                if !incomingResults.isEmpty {
+                    Button { incomingResults = []; incomingScanned = false } label: {
+                        Image(systemName: "xmark").font(.caption2)
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundColor(.secondary)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.top, 6)
+            .padding(.bottom, 4)
+
+            Divider()
+
             if incomingResults.isEmpty {
                 Text(incomingScanned ? "No invoices found." : "Select a folder and scan.")
                     .foregroundColor(.secondary)
                     .font(.system(.caption, design: .monospaced))
-                    .padding(8)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 3) {
+                    VStack(spacing: 0) {
                         ForEach(incomingResults) { result in
-                            HStack(spacing: 8) {
+                            HStack(spacing: 6) {
+                                Image(systemName: result.total > 0 ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                                    .font(.caption2)
+                                    .foregroundColor(result.total > 0 ? .green : .orange)
                                 Text(result.filename)
-                                    .font(.system(.caption, design: .monospaced))
+                                    .font(.system(.caption2, design: .monospaced))
                                     .lineLimit(1)
                                     .truncationMode(.middle)
-                                Spacer()
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                                 Text(result.source)
-                                    .font(.system(.caption2, design: .monospaced))
+                                    .font(.caption2)
                                     .foregroundColor(.secondary)
-                                    .frame(width: 90, alignment: .trailing)
+                                    .frame(width: 76, alignment: .leading)
                                 Text(String(format: "€%.2f", result.total))
-                                    .font(.system(.caption, design: .monospaced))
-                                    .foregroundColor(.green)
-                                    .frame(width: 64, alignment: .trailing)
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .frame(width: 68, alignment: .trailing)
                             }
                             .padding(.horizontal, 10)
+                            .padding(.vertical, 2)
                         }
                     }
-                    .padding(.vertical, 6)
                 }
+                .frame(maxHeight: 160)
+
                 Divider()
+
                 HStack {
-                    Spacer()
-                    Text("Total")
-                        .font(.system(.caption, design: .monospaced))
+                    Text("\(incomingResults.count) PDF(s)")
+                        .font(.caption2)
                         .foregroundColor(.secondary)
-                    Text(String(format: "€%.2f", incomingResults.reduce(0) { $0 + $1.total }))
-                        .font(.system(.caption, design: .monospaced))
-                        .fontWeight(.bold)
-                        .foregroundColor(.green)
-                        .frame(width: 64, alignment: .trailing)
+                    Spacer()
+                    Text(String(format: "Total: €%.2f", incomingResults.reduce(0) { $0 + $1.total }))
+                        .font(.caption)
+                        .fontWeight(.semibold)
                 }
                 .padding(.horizontal, 10)
-                .padding(.vertical, 5)
+                .padding(.vertical, 6)
             }
         }
-        .frame(height: 160)
-        .background(Color(NSColor.textBackgroundColor))
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(6)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
     }
 
     // MARK: - Outgoing invoice count results
