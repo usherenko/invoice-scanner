@@ -50,6 +50,12 @@ struct ContentView: View {
             }
         }
         .frame(width: 460)
+        .background(
+            Color.clear
+                .onChange(of: incomingResults.count) { _ in fitWindowToContent() }
+                .onChange(of: countResults.count)    { _ in fitWindowToContent() }
+                .onChange(of: activeTab)             { _ in fitWindowToContent() }
+        )
     }
 
     // MARK: - Tab picker
@@ -626,6 +632,14 @@ struct ContentView: View {
             incomingResults = results
             incomingScanned = true
             isScanning      = false
+        }
+    }
+
+    private func fitWindowToContent() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            guard let window = NSApp.windows.first(where: { $0.isKeyWindow }) ?? NSApp.windows.first,
+                  let contentView = window.contentView else { return }
+            window.setContentSize(contentView.fittingSize)
         }
     }
 
