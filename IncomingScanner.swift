@@ -37,24 +37,21 @@ enum IncomingScanner {
     // MARK: - Private helpers
 
     private static func extractTotal(from text: String) -> Double? {
-        let lines = text.components(separatedBy: .newlines)
-        for (i, line) in lines.enumerated() {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            let upper = trimmed.uppercased()
-            guard upper.hasPrefix("TOTAL"), !upper.hasPrefix("SUBTOTAL") else { continue }
-            let pool = [trimmed] + (i + 1 < lines.count ? [lines[i + 1]] : [])
-            for candidate in pool {
-                if let v = parseAmount(from: candidate) { return v }
-            }
-        }
-        return nil
-    }
+        // Match "Total" or "TOTAL" (not "Subtotal"/"SUBTOTAL") followed by a decimal amount
+        // within 10 characters (spans newlines to handle multi-line layouts).
+        // Take the LAST match — summary totals appear after column headers in the table.
+        guard let regex = try? NSRegularExpression(
+            pattern: #"(?<![Ss]ub)[Tt]otal\b.{0,10}([\d]+[.,][\d]{2})"#,
+            options: .dotMatchesLineSeparators
+        ) else { return nil }
 
-    private static func parseAmount(from line: String) -> Double? {
-        guard let regex = try? NSRegularExpression(pattern: #"€?([\d]+[.,][\d]{2})€?"#),
-              let match = regex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
-              let range = Range(match.range(at: 1), in: line) else { return nil }
-        let raw = String(line[range]).replacingOccurrences(of: ",", with: ".")
+        let range = NSRange(text.startIndex..., in: text)
+        let matches = regex.matches(in: text, range: range)
+
+        guard let last = matches.last,
+              let numRange = Range(last.range(at: 1), in: text) else { return nil }
+
+        let raw = String(text[numRange]).replacingOccurrences(of: ",", with: ".")
         return Double(raw)
     }
 
