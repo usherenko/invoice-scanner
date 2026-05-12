@@ -1,6 +1,6 @@
 import SwiftUI
 
-private enum Tab { case outgoing, incoming }
+private enum Tab { case outgoing, incoming, calculations }
 
 struct ContentView: View {
     @AppStorage("outputDir")   private var outputDir   = "\(NSHomeDirectory())/Invoices"
@@ -40,14 +40,14 @@ struct ContentView: View {
                 if !countResults.isEmpty {
                     invoiceCountView
                 }
-            } else {
-                incomingForm
-            }
-            Divider()
-            if activeTab == .outgoing {
+                Divider()
                 logArea
-            } else {
+            } else if activeTab == .incoming {
+                incomingForm
+                Divider()
                 incomingResultsArea
+            } else {
+                calculationsView
             }
         }
         .frame(width: 460)
@@ -59,6 +59,7 @@ struct ContentView: View {
         Picker("", selection: $activeTab) {
             Text("Outgoing").tag(Tab.outgoing)
             Text("Incoming").tag(Tab.incoming)
+            Text("Calculations").tag(Tab.calculations)
         }
         .pickerStyle(.segmented)
         .labelsHidden()
@@ -371,6 +372,76 @@ struct ContentView: View {
         .cornerRadius(6)
         .padding(.horizontal, 16)
         .padding(.vertical, 6)
+    }
+
+    // MARK: - Calculations tab
+
+    private var calculationsView: some View {
+        let outTotal = countResults.map(\.total).reduce(0, +)
+        let inTotal  = incomingResults.map(\.total).reduce(0, +)
+        let profit   = outTotal - inTotal
+        let hasData  = !countResults.isEmpty || !incomingResults.isEmpty
+
+        return VStack(spacing: 0) {
+            // Revenue row
+            HStack(alignment: .top, spacing: 0) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Revenue (Outgoing)")
+                        .font(.callout)
+                    Text(countResults.isEmpty
+                         ? "Not scanned — use Outgoing tab"
+                         : "\(selectedMonthLabel) · \(countResults.count) invoice(s)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                Text(countResults.isEmpty ? "—" : String(format: "€%.2f", outTotal))
+                    .font(.system(.callout, design: .monospaced))
+                    .foregroundColor(countResults.isEmpty ? .secondary : .primary)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+
+            Divider()
+
+            // Costs row
+            HStack(alignment: .top, spacing: 0) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Costs (Incoming)")
+                        .font(.callout)
+                    Text(incomingResults.isEmpty
+                         ? "Not scanned — use Incoming tab"
+                         : "\(incomingResults.count) invoice(s)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                Text(incomingResults.isEmpty ? "—" : String(format: "€%.2f", inTotal))
+                    .font(.system(.callout, design: .monospaced))
+                    .foregroundColor(incomingResults.isEmpty ? .secondary : .primary)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+
+            Divider()
+
+            // Profit row
+            HStack {
+                Text("Profit")
+                    .font(.callout)
+                    .fontWeight(.semibold)
+                Spacer()
+                Text(hasData ? String(format: "€%.2f", profit) : "—")
+                    .font(.system(.callout, design: .monospaced))
+                    .fontWeight(.bold)
+                    .foregroundColor(hasData ? (profit >= 0 ? .green : .red) : .secondary)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+
+            Spacer()
+        }
+        .frame(minHeight: 200)
     }
 
     // MARK: - Shared form row
