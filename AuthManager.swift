@@ -11,7 +11,7 @@ class AuthManager: NSObject, ObservableObject, ASWebAuthenticationPresentationCo
     @Published var userEmail  = ""
 
     // ── Paste your Azure client ID here ───────────────────────────────────────
-    let clientId    = "YOUR_CLIENT_ID"
+    let clientId    = "2300d93a-7725-4ed9-8ddb-a6ca25bdb750"
     // ─────────────────────────────────────────────────────────────────────────
 
     private let redirectUri    = "invoicescanner://auth"
