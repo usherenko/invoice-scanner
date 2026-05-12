@@ -1,11 +1,18 @@
 import SwiftUI
 
+private enum Tab { case outgoing, incoming }
+
 struct ContentView: View {
-    @AppStorage("outputDir") private var outputDir = "\(NSHomeDirectory())/Invoices"
+    @AppStorage("outputDir")   private var outputDir   = "\(NSHomeDirectory())/Invoices"
+    @AppStorage("incomingDir") private var incomingDir = "\(NSHomeDirectory())/Invoices/Incoming"
     @ObservedObject private var auth = AuthManager.shared
 
-    @State private var isRunning    = false
-    @State private var logLines:    [String] = []
+    @State private var activeTab        = Tab.outgoing
+    @State private var isRunning        = false
+    @State private var logLines:        [String] = []
+    @State private var isScanning       = false
+    @State private var incomingResults: [InvoiceResult] = []
+    @State private var incomingScanned  = false
     @State private var selectedMonth = Calendar.current.component(.month, from: Date())
     @State private var selectedYear  = Calendar.current.component(.year,  from: Date())
 
@@ -18,15 +25,34 @@ struct ContentView: View {
         VStack(spacing: 0) {
             header
             Divider()
-            if auth.isSignedIn {
-                form
+            tabPicker
+            Divider()
+            if activeTab == .outgoing {
+                if auth.isSignedIn { form } else { signInView }
             } else {
-                signInView
+                incomingForm
             }
             Divider()
-            logArea
+            if activeTab == .outgoing {
+                logArea
+            } else {
+                incomingResultsArea
+            }
         }
         .frame(width: 460)
+    }
+
+    // MARK: - Tab picker
+
+    private var tabPicker: some View {
+        Picker("", selection: $activeTab) {
+            Text("Outgoing").tag(Tab.outgoing)
+            Text("Incoming").tag(Tab.incoming)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 
     // MARK: - Header
@@ -82,7 +108,7 @@ struct ContentView: View {
         .padding(.horizontal, 32)
     }
 
-    // MARK: - Main form
+    // MARK: - Outgoing form
 
     private var form: some View {
         VStack(spacing: 0) {
@@ -140,6 +166,95 @@ struct ContentView: View {
         .padding(.horizontal, 16)
     }
 
+    // MARK: - Incoming form
+
+    private var incomingForm: some View {
+        VStack(spacing: 0) {
+            formRow(label: "Folder") {
+                TextField("~/Invoices/Incoming", text: $incomingDir)
+                    .textFieldStyle(.roundedBorder)
+                Button("…") { chooseIncomingFolder() }.buttonStyle(.borderless)
+            }
+
+            HStack {
+                Spacer()
+                Button(action: startIncomingScan) {
+                    HStack(spacing: 6) {
+                        if isScanning {
+                            ProgressView().scaleEffect(0.6).frame(width: 14, height: 14)
+                        } else {
+                            Image(systemName: "magnifyingglass.circle.fill")
+                        }
+                        Text(isScanning ? "Scanning…" : "Scan Folder").fontWeight(.medium)
+                    }
+                    .frame(minWidth: 160)
+                }
+                .disabled(isScanning)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .padding(.vertical, 14)
+                Spacer()
+            }
+        }
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: - Incoming results
+
+    private var incomingResultsArea: some View {
+        VStack(spacing: 0) {
+            if incomingResults.isEmpty {
+                Text(incomingScanned ? "No invoices found." : "Select a folder and scan.")
+                    .foregroundColor(.secondary)
+                    .font(.system(.caption, design: .monospaced))
+                    .padding(8)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 3) {
+                        ForEach(incomingResults) { result in
+                            HStack(spacing: 8) {
+                                Text(result.filename)
+                                    .font(.system(.caption, design: .monospaced))
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                Spacer()
+                                Text(result.source)
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .foregroundColor(.secondary)
+                                    .frame(width: 90, alignment: .trailing)
+                                Text(String(format: "€%.2f", result.total))
+                                    .font(.system(.caption, design: .monospaced))
+                                    .foregroundColor(.green)
+                                    .frame(width: 64, alignment: .trailing)
+                            }
+                            .padding(.horizontal, 10)
+                        }
+                    }
+                    .padding(.vertical, 6)
+                }
+                Divider()
+                HStack {
+                    Spacer()
+                    Text("Total")
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundColor(.secondary)
+                    Text(String(format: "€%.2f", incomingResults.reduce(0) { $0 + $1.total }))
+                        .font(.system(.caption, design: .monospaced))
+                        .fontWeight(.bold)
+                        .foregroundColor(.green)
+                        .frame(width: 64, alignment: .trailing)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+            }
+        }
+        .frame(height: 160)
+        .background(Color(NSColor.textBackgroundColor))
+    }
+
+    // MARK: - Shared form row
+
     private func formRow<Content: View>(label: String, @ViewBuilder content: () -> Content) -> some View {
         HStack(alignment: .center, spacing: 12) {
             Text(label)
@@ -151,7 +266,7 @@ struct ContentView: View {
         .padding(.vertical, 8)
     }
 
-    // MARK: - Log area
+    // MARK: - Log area (outgoing)
 
     private var logArea: some View {
         ScrollViewReader { proxy in
@@ -212,14 +327,38 @@ struct ContentView: View {
         }
     }
 
+    private func chooseIncomingFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories    = true
+        panel.canChooseFiles          = false
+        panel.allowsMultipleSelection = false
+        panel.prompt                  = "Select"
+        if panel.runModal() == .OK, let url = panel.url {
+            incomingDir = url.path
+        }
+    }
+
     private func startScan() {
         logLines  = []
         isRunning = true
-        let month  = String(format: "%04d-%02d", selectedYear, selectedMonth)
+        let month   = String(format: "%04d-%02d", selectedYear, selectedMonth)
         let dirCopy = outputDir
         Task {
             await ScanManager.scan(month: month, outputDir: dirCopy, log: appendLog)
             await MainActor.run { isRunning = false }
+        }
+    }
+
+    private func startIncomingScan() {
+        isScanning      = true
+        incomingScanned = false
+        incomingResults = []
+        let folder = URL(fileURLWithPath: incomingDir)
+        Task {
+            let results = await Task.detached { IncomingScanner.scan(folder: folder) }.value
+            incomingResults = results
+            incomingScanned = true
+            isScanning      = false
         }
     }
 
