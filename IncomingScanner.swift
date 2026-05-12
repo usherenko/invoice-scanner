@@ -22,10 +22,17 @@ enum IncomingScanner {
 
     static func parse(url: URL) -> InvoiceResult? {
         guard let doc = PDFDocument(url: url) else { return nil }
-        var text = ""
-        for i in 0..<doc.pageCount {
-            text += doc.page(at: i)?.string ?? ""
+
+        // Try page-by-page extraction first, fall back to document-level string.
+        var text = (0..<doc.pageCount)
+            .compactMap { doc.page(at: $0)?.string }
+            .joined(separator: "\n")
+
+        if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           let docText = doc.string {
+            text = docText
         }
+
         guard let total = extractTotal(from: text) else { return nil }
         return InvoiceResult(
             filename: url.lastPathComponent,
@@ -37,33 +44,23 @@ enum IncomingScanner {
     // MARK: - Private helpers
 
     private static func extractTotal(from text: String) -> Double? {
-        // Split into lines and find any line that contains "total" but not "subtotal".
-        // Search that line and the next 2 lines for a decimal amount.
-        // Keep the LAST amount found — summary totals appear after column headers.
-        let lines = text.components(separatedBy: .newlines)
-        var lastAmount: Double? = nil
+        // Match "total" (case-insensitive) NOT preceded by "sub", followed by
+        // up to 20 non-digit characters (spaces, €, newlines), then a decimal amount.
+        // [^\d]{0,20} bridges whitespace and currency symbols without crossing into
+        // unrelated numbers.
+        // Return the MAX across all matches — the grand total is always the
+        // largest figure; line-item totals and column headers are smaller.
+        guard let regex = try? NSRegularExpression(
+            pattern: #"(?<![Ss]ub)total\b[^\d]{0,20}(\d+[.,]\d{2})"#,
+            options: .caseInsensitive
+        ) else { return nil }
 
-        for (i, line) in lines.enumerated() {
-            let lower = line.lowercased()
-            guard lower.contains("total"), !lower.contains("subtotal") else { continue }
-
-            for j in i..<min(i + 3, lines.count) {
-                if let v = decimalAmount(in: lines[j]) {
-                    lastAmount = v
-                    break
-                }
-            }
+        let range = NSRange(text.startIndex..., in: text)
+        let amounts = regex.matches(in: text, range: range).compactMap { match -> Double? in
+            guard let r = Range(match.range(at: 1), in: text) else { return nil }
+            return Double(String(text[r]).replacingOccurrences(of: ",", with: "."))
         }
-        return lastAmount
-    }
-
-    private static func decimalAmount(in line: String) -> Double? {
-        // Match any decimal number: one or more digits, comma or period, exactly 2 digits.
-        guard let regex = try? NSRegularExpression(pattern: #"(\d+[.,]\d{2})"#),
-              let match = regex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
-              let range = Range(match.range(at: 1), in: line) else { return nil }
-        let raw = String(line[range]).replacingOccurrences(of: ",", with: ".")
-        return Double(raw)
+        return amounts.max()
     }
 
     private static func detectSource(from text: String) -> String {
