@@ -401,27 +401,27 @@ struct ContentView: View {
     // MARK: - Calculations tab
 
     private var calculationsView: some View {
-        let outTotal = countResults.map(\.total).reduce(0, +)
-        let inTotal  = incomingResults.map(\.total).reduce(0, +)
-        let profit   = outTotal - inTotal
-        let hasData  = !countResults.isEmpty || !incomingResults.isEmpty
+        let revenue = incomingResults.map(\.total).reduce(0, +)
+        let costs   = countResults.map(\.total).reduce(0, +)
+        let profit  = revenue - costs
+        let hasData = !incomingResults.isEmpty || !countResults.isEmpty
 
         return VStack(spacing: 0) {
             // Revenue row
             HStack(alignment: .top, spacing: 0) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Revenue (Outgoing)")
+                    Text("Revenue (Incoming)")
                         .font(.callout)
-                    Text(countResults.isEmpty
-                         ? "Not scanned — use Outgoing tab"
-                         : "\(selectedMonthLabel) · \(countResults.count) invoice(s)")
+                    Text(incomingResults.isEmpty
+                         ? "Not scanned — use Incoming tab"
+                         : "\(incomingResults.count) invoice(s)")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
                 Spacer()
-                Text(countResults.isEmpty ? "—" : String(format: "€%.2f", outTotal))
+                Text(incomingResults.isEmpty ? "—" : String(format: "€%.2f", revenue))
                     .font(.system(.callout, design: .monospaced))
-                    .foregroundColor(countResults.isEmpty ? .secondary : .primary)
+                    .foregroundColor(incomingResults.isEmpty ? .secondary : .primary)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
@@ -431,18 +431,18 @@ struct ContentView: View {
             // Costs row
             HStack(alignment: .top, spacing: 0) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Costs (Incoming)")
+                    Text("Costs (Outgoing)")
                         .font(.callout)
-                    Text(incomingResults.isEmpty
-                         ? "Not scanned — use Incoming tab"
-                         : "\(incomingResults.count) invoice(s)")
+                    Text(countResults.isEmpty
+                         ? "Not scanned — use Outgoing tab"
+                         : "\(selectedMonthLabel) · \(countResults.count) invoice(s)")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
                 Spacer()
-                Text(incomingResults.isEmpty ? "—" : String(format: "€%.2f", inTotal))
+                Text(countResults.isEmpty ? "—" : String(format: "€%.2f", costs))
                     .font(.system(.callout, design: .monospaced))
-                    .foregroundColor(incomingResults.isEmpty ? .secondary : .primary)
+                    .foregroundColor(countResults.isEmpty ? .secondary : .primary)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
