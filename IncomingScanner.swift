@@ -37,21 +37,32 @@ enum IncomingScanner {
     // MARK: - Private helpers
 
     private static func extractTotal(from text: String) -> Double? {
-        // Match "Total" or "TOTAL" (not "Subtotal"/"SUBTOTAL") followed by a decimal amount
-        // within 10 characters (spans newlines to handle multi-line layouts).
-        // Take the LAST match — summary totals appear after column headers in the table.
-        guard let regex = try? NSRegularExpression(
-            pattern: #"(?<![Ss]ub)[Tt]otal\b.{0,10}([\d]+[.,][\d]{2})"#,
-            options: .dotMatchesLineSeparators
-        ) else { return nil }
+        // Split into lines and find any line that contains "total" but not "subtotal".
+        // Search that line and the next 2 lines for a decimal amount.
+        // Keep the LAST amount found — summary totals appear after column headers.
+        let lines = text.components(separatedBy: .newlines)
+        var lastAmount: Double? = nil
 
-        let range = NSRange(text.startIndex..., in: text)
-        let matches = regex.matches(in: text, range: range)
+        for (i, line) in lines.enumerated() {
+            let lower = line.lowercased()
+            guard lower.contains("total"), !lower.contains("subtotal") else { continue }
 
-        guard let last = matches.last,
-              let numRange = Range(last.range(at: 1), in: text) else { return nil }
+            for j in i..<min(i + 3, lines.count) {
+                if let v = decimalAmount(in: lines[j]) {
+                    lastAmount = v
+                    break
+                }
+            }
+        }
+        return lastAmount
+    }
 
-        let raw = String(text[numRange]).replacingOccurrences(of: ",", with: ".")
+    private static func decimalAmount(in line: String) -> Double? {
+        // Match any decimal number: one or more digits, comma or period, exactly 2 digits.
+        guard let regex = try? NSRegularExpression(pattern: #"(\d+[.,]\d{2})"#),
+              let match = regex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
+              let range = Range(match.range(at: 1), in: line) else { return nil }
+        let raw = String(line[range]).replacingOccurrences(of: ",", with: ".")
         return Double(raw)
     }
 
