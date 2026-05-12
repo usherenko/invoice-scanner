@@ -37,6 +37,7 @@ targets:
       - sdk: Security.framework
       - sdk: AuthenticationServices.framework
       - sdk: CryptoKit.framework
+      - sdk: PDFKit.framework
     settings:
       base:
         PRODUCT_NAME: GoDaddy Invoice Scanner
