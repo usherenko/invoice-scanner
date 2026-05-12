@@ -12,7 +12,7 @@ struct GraphClient {
     func invoiceMessages(month: String) async throws -> [Message] {
         let (start, end) = dateRange(for: month)
         var results: [Message] = []
-        var url: String? = "\(base)/me/messages"
+        var url: String? = "\(base)/me/mailFolders/inbox/messages"
             + "?$search=%22invoice%22"
             + "&$select=id,subject,receivedDateTime,hasAttachments"
             + "&$top=50"
@@ -38,7 +38,6 @@ struct GraphClient {
     /// Returns PDF attachments for a given message as (filename, Data) pairs.
     func pdfAttachments(messageId: String) async throws -> [(String, Data)] {
         let url = "\(base)/me/messages/\(messageId)/attachments"
-            + "?$select=id,name,contentType,contentBytes"
         let page: PageResponse<Attachment> = try await get(url)
 
         return page.value.compactMap { att in
