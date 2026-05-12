@@ -23,7 +23,6 @@ enum IncomingScanner {
     static func parse(url: URL) -> InvoiceResult? {
         guard let doc = PDFDocument(url: url) else { return nil }
 
-        // Try page-by-page extraction first, fall back to document-level string.
         var text = (0..<doc.pageCount)
             .compactMap { doc.page(at: $0)?.string }
             .joined(separator: "\n")
@@ -44,14 +43,19 @@ enum IncomingScanner {
     // MARK: - Private helpers
 
     private static func extractTotal(from text: String) -> Double? {
-        // Match "total" (case-insensitive) NOT preceded by "sub", followed by
-        // up to 20 non-digit characters (spaces, €, newlines), then a decimal amount.
-        // [^\d]{0,20} bridges whitespace and currency symbols without crossing into
-        // unrelated numbers.
-        // Return the MAX across all matches — the grand total is always the
-        // largest figure; line-item totals and column headers are smaller.
+        // Pattern breakdown:
+        //   (?<![Ss]ub) — negative lookbehind: skip "Subtotal"/"SUBTOTAL"
+        //   total\b     — the word "total" (case-insensitive via option)
+        //   [^\d\n]*    — unlimited non-digit chars on the same line (covers right-aligned
+        //                 layouts where the label and amount have many spaces between them)
+        //   \n?         — optionally cross one newline (amount on next line)
+        //   [^\d\n]*    — non-digit chars before the number on the next line (e.g. "€")
+        //   (\d+[.,]\d{2}) — the decimal amount (comma or period separator)
+        //
+        // Taking max() across all matches because the grand total is always the
+        // largest figure; column-header "TOTAL" rows pick up smaller line-item amounts.
         guard let regex = try? NSRegularExpression(
-            pattern: #"(?<![Ss]ub)total\b[^\d]{0,20}(\d+[.,]\d{2})"#,
+            pattern: #"(?<![Ss]ub)total\b[^\d\n]*\n?[^\d\n]*(\d+[.,]\d{2})"#,
             options: .caseInsensitive
         ) else { return nil }
 
