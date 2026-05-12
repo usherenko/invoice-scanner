@@ -1,34 +1,35 @@
 import SwiftUI
 
 struct ContentView: View {
-    @AppStorage("email")     private var email     = ""
     @AppStorage("outputDir") private var outputDir = "\(NSHomeDirectory())/Invoices"
+    @ObservedObject private var auth = AuthManager.shared
 
-    @State private var password     = ""
     @State private var isRunning    = false
-    @State private var logLines: [String] = []
+    @State private var logLines:    [String] = []
     @State private var selectedMonth = Calendar.current.component(.month, from: Date())
     @State private var selectedYear  = Calendar.current.component(.year,  from: Date())
 
     private let months = ["January","February","March","April","May","June",
                           "July","August","September","October","November","December"]
     private var years: [Int] { (2020...Calendar.current.component(.year, from: Date())).reversed().map { $0 } }
-
     private var selectedMonthLabel: String { "\(months[selectedMonth - 1]) \(selectedYear)" }
 
     var body: some View {
         VStack(spacing: 0) {
             header
             Divider()
-            form
+            if auth.isSignedIn {
+                form
+            } else {
+                signInView
+            }
             Divider()
             logArea
         }
         .frame(width: 460)
-        .onAppear { password = KeychainHelper.load(account: email) ?? "" }
     }
 
-    // MARK: - Sections
+    // MARK: - Header
 
     private var header: some View {
         HStack(spacing: 10) {
@@ -38,59 +39,82 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Invoice Scanner")
                     .font(.headline)
-                Text("Scanning \(selectedMonthLabel)")
+                Text(auth.isSignedIn ? "Scanning \(selectedMonthLabel)" : "Sign in to get started")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
             Spacer()
+            if auth.isSignedIn {
+                Button("Sign out") { auth.signOut() }
+                    .buttonStyle(.borderless)
+                    .foregroundColor(.secondary)
+                    .font(.caption)
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
     }
 
+    // MARK: - Sign-in view
+
+    private var signInView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "envelope.badge.shield.half.filled")
+                .font(.system(size: 40))
+                .foregroundColor(.blue)
+                .padding(.top, 24)
+            Text("Connect your Microsoft 365 account\nto download invoice PDFs.")
+                .multilineTextAlignment(.center)
+                .foregroundColor(.secondary)
+                .font(.callout)
+            Button(action: startSignIn) {
+                HStack(spacing: 8) {
+                    Image(systemName: "person.badge.key.fill")
+                    Text("Sign in with Microsoft")
+                        .fontWeight(.medium)
+                }
+                .frame(minWidth: 220)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .padding(.bottom, 24)
+        }
+        .padding(.horizontal, 32)
+    }
+
+    // MARK: - Main form
+
     private var form: some View {
         VStack(spacing: 0) {
-            formRow(label: "Email") {
-                TextField("you@yourdomain.com", text: $email)
-                    .textFieldStyle(.roundedBorder)
-            }
-            Divider().padding(.leading, 80)
-            formRow(label: "Password") {
-                SecureField("••••••••", text: $password)
-                    .textFieldStyle(.roundedBorder)
+            formRow(label: "Account") {
+                Text(auth.userEmail)
+                    .foregroundColor(.secondary)
+                    .font(.callout)
+                Spacer()
             }
             Divider().padding(.leading, 80)
             formRow(label: "Month") {
                 Picker("", selection: $selectedMonth) {
-                    ForEach(1...12, id: \.self) { i in
-                        Text(months[i - 1]).tag(i)
-                    }
+                    ForEach(1...12, id: \.self) { i in Text(months[i - 1]).tag(i) }
                 }
-                .labelsHidden()
-                .frame(width: 120)
+                .labelsHidden().frame(width: 120)
 
                 Picker("", selection: $selectedYear) {
-                    ForEach(years, id: \.self) { y in
-                        Text(String(y)).tag(y)
-                    }
+                    ForEach(years, id: \.self) { y in Text(String(y)).tag(y) }
                 }
-                .labelsHidden()
-                .frame(width: 80)
+                .labelsHidden().frame(width: 80)
 
                 Button("This month") {
                     selectedMonth = Calendar.current.component(.month, from: Date())
                     selectedYear  = Calendar.current.component(.year,  from: Date())
                 }
-                .buttonStyle(.borderless)
-                .foregroundColor(.blue)
-                .font(.callout)
+                .buttonStyle(.borderless).foregroundColor(.blue).font(.callout)
             }
             Divider().padding(.leading, 80)
             formRow(label: "Save to") {
                 TextField("~/Invoices", text: $outputDir)
                     .textFieldStyle(.roundedBorder)
-                Button("…") { chooseFolder() }
-                    .buttonStyle(.borderless)
+                Button("…") { chooseFolder() }.buttonStyle(.borderless)
             }
 
             HStack {
@@ -102,12 +126,11 @@ struct ContentView: View {
                         } else {
                             Image(systemName: "arrow.down.circle.fill")
                         }
-                        Text(isRunning ? "Scanning…" : "Download Invoices")
-                            .fontWeight(.medium)
+                        Text(isRunning ? "Scanning…" : "Download Invoices").fontWeight(.medium)
                     }
                     .frame(minWidth: 160)
                 }
-                .disabled(isRunning || email.isEmpty || password.isEmpty)
+                .disabled(isRunning)
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .padding(.vertical, 14)
@@ -127,6 +150,8 @@ struct ContentView: View {
         }
         .padding(.vertical, 8)
     }
+
+    // MARK: - Log area
 
     private var logArea: some View {
         ScrollViewReader { proxy in
@@ -148,7 +173,7 @@ struct ContentView: View {
                 }
                 .padding(10)
             }
-            .frame(height: 180)
+            .frame(height: 160)
             .background(Color(NSColor.textBackgroundColor))
             .onChange(of: logLines.count, perform: { _ in
                 withAnimation { proxy.scrollTo(logLines.count - 1, anchor: .bottom) }
@@ -164,6 +189,18 @@ struct ContentView: View {
 
     // MARK: - Actions
 
+    private func startSignIn() {
+        logLines = []
+        Task {
+            do {
+                try await auth.signIn()
+                appendLog("Signed in as \(auth.userEmail)")
+            } catch {
+                appendLog("❌  \(error.localizedDescription)")
+            }
+        }
+    }
+
     private func chooseFolder() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories    = true
@@ -176,23 +213,12 @@ struct ContentView: View {
     }
 
     private func startScan() {
-        KeychainHelper.save(password: password, account: email)
         logLines  = []
         isRunning = true
-
-        let emailCopy = email
-        let passCopy  = password
-        let dirCopy   = outputDir
-        let month     = String(format: "%04d-%02d", selectedYear, selectedMonth)
-
+        let month  = String(format: "%04d-%02d", selectedYear, selectedMonth)
+        let dirCopy = outputDir
         Task {
-            await ScanManager.scan(
-                email:     emailCopy,
-                password:  passCopy,
-                month:     month,
-                outputDir: dirCopy,
-                log:       appendLog
-            )
+            await ScanManager.scan(month: month, outputDir: dirCopy, log: appendLog)
             await MainActor.run { isRunning = false }
         }
     }

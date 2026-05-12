@@ -29,9 +29,14 @@ targets:
         LSMinimumSystemVersion: "12.0"
         NSPrincipalClass: NSApplication
         NSHighResolutionCapable: true
+        CFBundleURLTypes:
+          - CFBundleURLName: com.usherenko.invoicescanner
+            CFBundleURLSchemes:
+              - invoicescanner
     dependencies:
-      - sdk: Network.framework
       - sdk: Security.framework
+      - sdk: AuthenticationServices.framework
+      - sdk: CryptoKit.framework
     settings:
       base:
         PRODUCT_NAME: GoDaddy Invoice Scanner

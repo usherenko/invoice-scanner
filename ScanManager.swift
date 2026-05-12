@@ -3,47 +3,33 @@ import Foundation
 struct ScanManager {
 
     static func scan(
-        email:     String,
-        password:  String,
         month:     String,
         outputDir: String,
         log:       @escaping (String) -> Void
     ) async {
-        let client = IMAPClient()
-
         do {
-            log("Connecting to \(IMAP_HOST)…")
-            try await client.connect(host: IMAP_HOST, port: IMAP_PORT)
-
-            log("Logging in…")
-            try await client.login(user: email, password: password)
+            log("Getting access token…")
+            let token  = try await AuthManager.shared.getValidToken()
+            let client = GraphClient(token: token)
 
             log("Searching inbox for \(month) invoices…")
-            try await client.selectInbox()
+            let messages = try await client.invoiceMessages(month: month)
 
-            let (since, before) = imapDateRange(for: month)
-            let ids = try await client.search(
-                query: "TEXT \"invoice\" SINCE \"\(since)\" BEFORE \"\(before)\""
-            )
-
-            guard !ids.isEmpty else {
+            guard !messages.isEmpty else {
                 log("No invoice emails found for \(month).")
-                try await client.logout()
                 return
             }
 
-            log("Found \(ids.count) email(s) — downloading PDFs…\n")
+            log("Found \(messages.count) email(s) — downloading PDFs…\n")
 
             let outDir = URL(fileURLWithPath: outputDir).appendingPathComponent(month)
             try FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
 
             var savedCount = 0
-            for id in ids {
-                let rawMessage = try await client.fetchMessage(id: id)
-                let pdfs = MIMEParser.extractPDFs(from: rawMessage)
-
+            for msg in messages {
+                let pdfs = try await client.pdfAttachments(messageId: msg.id)
                 if pdfs.isEmpty {
-                    log("  –  No PDF in message #\(id)")
+                    log("  –  No PDF in: \(msg.subject ?? "(no subject)")")
                 } else {
                     for (filename, data) in pdfs {
                         let dest = uniqueURL(for: filename, in: outDir)
@@ -54,33 +40,11 @@ struct ScanManager {
                 }
             }
 
-            try await client.logout()
             log("\nDone — \(savedCount) PDF(s) saved to \(outputDir)/\(month)")
 
         } catch {
             log("❌  \(error.localizedDescription)")
         }
-    }
-
-    // MARK: - Helpers
-
-    private static func imapDateRange(for month: String) -> (String, String) {
-        let df = DateFormatter()
-        df.dateFormat = "yyyy-MM"
-        df.locale = Locale(identifier: "en_US_POSIX")
-        guard let date = df.date(from: month) else { return ("", "") }
-
-        let cal       = Calendar.current
-        let nextMonth = cal.date(byAdding: .month, value: 1, to: date)!
-
-        return (imapDateString(date), imapDateString(nextMonth))
-    }
-
-    private static func imapDateString(_ date: Date) -> String {
-        let df = DateFormatter()
-        df.dateFormat = "dd-MMM-yyyy"
-        df.locale = Locale(identifier: "en_US_POSIX")
-        return df.string(from: date)
     }
 
     private static func uniqueURL(for filename: String, in dir: URL) -> URL {
