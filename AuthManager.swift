@@ -16,7 +16,7 @@ class AuthManager: NSObject, ObservableObject, ASWebAuthenticationPresentationCo
 
     private let redirectUri    = "invoicescanner://auth"
     private let redirectScheme = "invoicescanner"
-    private let scopes         = "https://graph.microsoft.com/Mail.Read https://graph.microsoft.com/User.Read offline_access"
+    private let scopes         = "https://graph.microsoft.com/Mail.Read offline_access"
     private let tokenURL       = URL(string: "https://login.microsoftonline.com/common/oauth2/v2.0/token")!
 
     private var accessToken:  String?
