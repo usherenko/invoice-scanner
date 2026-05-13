@@ -16,7 +16,7 @@ class AuthManager: NSObject, ObservableObject, ASWebAuthenticationPresentationCo
 
     private let redirectUri    = "invoicescanner://auth"
     private let redirectScheme = "invoicescanner"
-    private let scopes         = "https://graph.microsoft.com/Mail.Read offline_access"
+    private let scopes         = "https://graph.microsoft.com/Mail.Read https://graph.microsoft.com/User.Read offline_access"
     private let tokenURL       = URL(string: "https://login.microsoftonline.com/common/oauth2/v2.0/token")!
 
     private var accessToken:  String?
@@ -33,7 +33,10 @@ class AuthManager: NSObject, ObservableObject, ASWebAuthenticationPresentationCo
         userEmail   = UserDefaults.standard.string(forKey: "ms_user_email") ?? ""
         isSignedIn  = refreshToken != nil
         if isSignedIn && userEmail.isEmpty {
-            Task { try? await fetchEmail() }
+            Task {
+                do { try await fetchEmail() }
+                catch { isSignedIn = false }
+            }
         }
     }
 
@@ -148,14 +151,39 @@ class AuthManager: NSObject, ObservableObject, ASWebAuthenticationPresentationCo
 
     private func fetchEmail() async throws {
         let token = try await getValidToken()
-        var req = URLRequest(url: URL(string: "https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName")!)
-        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        let (data, _) = try await URLSession.shared.data(for: req)
-        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            let email = json["mail"] as? String ?? json["userPrincipalName"] as? String ?? ""
+
+        // Try to decode UPN from the JWT payload — works with existing tokens regardless of scope
+        if let email = jwtClaim(token, key: "upn") ?? jwtClaim(token, key: "preferred_username") ?? jwtClaim(token, key: "unique_name"), !email.isEmpty {
             userEmail = email
             UserDefaults.standard.set(email, forKey: "ms_user_email")
+            return
         }
+
+        // Fall back to /me (requires User.Read scope)
+        var req = URLRequest(url: URL(string: "https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName")!)
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) else { return }
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            let email = (json["mail"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+                ?? (json["userPrincipalName"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+                ?? ""
+            if !email.isEmpty {
+                userEmail = email
+                UserDefaults.standard.set(email, forKey: "ms_user_email")
+            }
+        }
+    }
+
+    private func jwtClaim(_ token: String, key: String) -> String? {
+        let parts = token.components(separatedBy: ".")
+        guard parts.count >= 2 else { return nil }
+        var b64 = parts[1].replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        while b64.count % 4 != 0 { b64 += "=" }
+        guard let data = Data(base64Encoded: b64),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return nil }
+        return json[key] as? String
     }
 
     // MARK: - PKCE helpers
