@@ -32,6 +32,9 @@ class AuthManager: NSObject, ObservableObject, ASWebAuthenticationPresentationCo
         }
         userEmail   = UserDefaults.standard.string(forKey: "ms_user_email") ?? ""
         isSignedIn  = refreshToken != nil
+        if isSignedIn && userEmail.isEmpty {
+            Task { try? await fetchEmail() }
+        }
     }
 
     // MARK: - Public
