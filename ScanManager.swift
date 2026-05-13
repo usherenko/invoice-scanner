@@ -25,28 +25,25 @@ struct ScanManager {
             let outDir = URL(fileURLWithPath: outputDir).appendingPathComponent(month)
             try FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
 
-            var downloaded = loadManifest(from: outDir)
             var savedCount = 0
             var skippedCount = 0
 
             for msg in messages {
-                if downloaded.contains(msg.id) {
-                    log("  –  Already have: \(msg.subject ?? "(no subject)")")
-                    skippedCount += 1
-                    continue
-                }
                 let pdfs = try await client.pdfAttachments(messageId: msg.id)
                 if pdfs.isEmpty {
                     log("  –  No PDF in: \(msg.subject ?? "(no subject)")")
                 } else {
                     for (filename, data) in pdfs {
-                        let dest = uniqueURL(for: filename, in: outDir)
-                        try data.write(to: dest)
-                        log("  ✓  \(dest.lastPathComponent)")
-                        savedCount += 1
+                        let dest = outDir.appendingPathComponent(filename)
+                        if FileManager.default.fileExists(atPath: dest.path) {
+                            log("  –  Already have: \(filename)")
+                            skippedCount += 1
+                        } else {
+                            try data.write(to: dest)
+                            log("  ✓  \(filename)")
+                            savedCount += 1
+                        }
                     }
-                    downloaded.insert(msg.id)
-                    saveManifest(downloaded, to: outDir)
                 }
             }
 
@@ -58,23 +55,6 @@ struct ScanManager {
 
         } catch {
             log("❌  \(error.localizedDescription)")
-        }
-    }
-
-    private static let manifestName = ".downloaded.json"
-
-    private static func loadManifest(from dir: URL) -> Set<String> {
-        let url = dir.appendingPathComponent(manifestName)
-        guard let data = try? Data(contentsOf: url),
-              let ids  = try? JSONDecoder().decode([String].self, from: data)
-        else { return [] }
-        return Set(ids)
-    }
-
-    private static func saveManifest(_ ids: Set<String>, to dir: URL) {
-        let url = dir.appendingPathComponent(manifestName)
-        if let data = try? JSONEncoder().encode(Array(ids)) {
-            try? data.write(to: url)
         }
     }
 
