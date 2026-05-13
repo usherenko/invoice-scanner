@@ -61,21 +61,45 @@ enum IncomingScanner {
     }
 
     private static func extractTotal(from text: String) -> Double? {
-        // Find every decimal amount (X.XX or X,XX) in the document and return the max.
+        // Find every decimal amount in the document and return the max.
         //
         // Why max() instead of label-matching:
-        // - Holded: PDFKit extracts table columns separately, placing "TOTAL 529,50€"
-        //   and "424,50€" rows far apart with no reliable "total" label bridge.
-        // - CommonGround: after line-reversal the amounts are readable but label
-        //   proximity is not guaranteed.
+        // - Holded: PDFKit extracts table columns separately, so "TOTAL" and its amount
+        //   are too far apart to bridge reliably.
+        // - CommonGround: after line-reversal amounts are readable but label proximity
+        //   is not guaranteed.
         // The grand total is always >= every line-item amount and subtotal by definition.
-        guard let regex = try? NSRegularExpression(pattern: #"(\d+[.,]\d{2})"#) else { return nil }
+        //
+        // Pattern handles European thousands-separator format (3.467,50) and simple
+        // decimals (529,50). Structure: leading digits, optional sep+3digit groups
+        // (thousands), then sep+2digits (cents). This prevents "3.467,50" from being
+        // split into "3.46" + "7,50" by the old \d+[.,]\d{2} pattern.
+        guard let regex = try? NSRegularExpression(
+            pattern: #"(\d+(?:[.,]\d{3})*[.,]\d{2})"#
+        ) else { return nil }
         let range = NSRange(text.startIndex..., in: text)
         let amounts = regex.matches(in: text, range: range).compactMap { match -> Double? in
             guard let r = Range(match.range(at: 1), in: text) else { return nil }
-            return Double(String(text[r]).replacingOccurrences(of: ",", with: "."))
+            return parseAmount(String(text[r]))
         }
         return amounts.max()
+    }
+
+    // Converts a matched amount string to Double regardless of separator convention.
+    // Detects format by which separator appears last: comma-last = European (12.171,20),
+    // dot-last = US/simple (12,171.20 or 529.50), comma-only = European simple (529,50).
+    private static func parseAmount(_ s: String) -> Double? {
+        let lastComma = s.lastIndex(of: ",")
+        let lastDot   = s.lastIndex(of: ".")
+        if let c = lastComma, let d = lastDot {
+            return c > d
+                ? Double(s.replacingOccurrences(of: ".", with: "").replacingOccurrences(of: ",", with: "."))
+                : Double(s.replacingOccurrences(of: ",", with: ""))
+        } else if lastComma != nil {
+            return Double(s.replacingOccurrences(of: ",", with: "."))
+        } else {
+            return Double(s)
+        }
     }
 
     private static func detectSource(from text: String) -> String {
