@@ -82,7 +82,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Invoice Scanner")
                     .font(.headline)
-                Text(auth.isSignedIn ? "Scanning \(selectedMonthLabel)" : "Sign in to get started")
+                Text(auth.isSignedIn ? auth.userEmail : "Sign in to get started")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
