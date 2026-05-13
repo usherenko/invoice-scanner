@@ -68,6 +68,7 @@ struct ContentView: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
+        .tint(.blue)
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
     }
@@ -167,13 +168,14 @@ struct ContentView: View {
                         if isCounting && !isRunning {
                             ProgressView().scaleEffect(0.6).frame(width: 14, height: 14)
                         } else {
-                            Image(systemName: "sum")
+                            Image(systemName: "magnifyingglass.circle.fill")
                         }
                         Text("Count Folder").fontWeight(.medium)
                     }
+                    .frame(minWidth: 160)
                 }
                 .disabled(isCounting || isRunning)
-                .buttonStyle(.bordered)
+                .buttonStyle(.borderedProminent)
                 .controlSize(.large)
 
                 Button(action: startScan) {
@@ -213,13 +215,14 @@ struct ContentView: View {
                         if isCounting {
                             ProgressView().scaleEffect(0.6).frame(width: 14, height: 14)
                         } else {
-                            Image(systemName: "sum")
+                            Image(systemName: "magnifyingglass.circle.fill")
                         }
                         Text("Count Folder").fontWeight(.medium)
                     }
+                    .frame(minWidth: 160)
                 }
                 .disabled(isCounting)
-                .buttonStyle(.bordered)
+                .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 Spacer()
             }
